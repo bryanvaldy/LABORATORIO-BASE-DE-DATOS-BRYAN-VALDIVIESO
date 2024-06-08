@@ -1,0 +1,290 @@
+
+CREATE DATABASE IF NOT EXISTS REDSOCIAL_BDLABFINALV5;
+USE REDSOCIAL_BDLABFINALV5;
+
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+    user_id INT AUTO_INCREMENT,
+    user_handle VARCHAR(50) NOT NULL UNIQUE,
+    email_address VARCHAR(50) NOT NULL UNIQUE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    phonenumber CHAR(20) UNIQUE,
+    follower_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id)
+);
+
+-- Create tweets table
+CREATE TABLE IF NOT EXISTS tweets (
+    tweet_id INT AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    tweet_text VARCHAR(280) NOT NULL,
+    num_likes INT DEFAULT 0,
+    num_retweets INT DEFAULT 0,
+    num_comments INT DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (tweet_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Create retweets table
+CREATE TABLE IF NOT EXISTS retweets (
+    retweet_id INT AUTO_INCREMENT PRIMARY KEY,
+    tweet_id INT NOT NULL,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    quoted_tweet_text VARCHAR(280),
+    is_quoted BOOLEAN NOT NULL,
+    num_comments INT DEFAULT 0,
+    num_likes INT DEFAULT 0,
+    quoted_user_id INT,
+    is_retweet BOOLEAN NOT NULL,
+    FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (quoted_user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+-- Create comments table
+CREATE TABLE IF NOT EXISTS comments (
+    comment_id INT AUTO_INCREMENT PRIMARY KEY,
+    tweet_id INT NOT NULL,
+    user_id INT NOT NULL,
+    comment_text VARCHAR(280) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    parent_comment_id INT,
+    num_likes INT DEFAULT 0,
+    is_comment BOOLEAN NOT NULL,
+    commented_tweet_text VARCHAR(280),
+    commented_user_id INT NOT NULL,
+    FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_comment_id) REFERENCES comments(comment_id) ON DELETE SET NULL,
+    FOREIGN KEY (commented_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Create likes table
+CREATE TABLE IF NOT EXISTS likes (
+    like_id INT AUTO_INCREMENT PRIMARY KEY,
+    tweet_id INT NOT NULL,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_liked BOOLEAN NOT NULL,
+    liked_tweet_text VARCHAR(280),
+    liked_user_id INT NOT NULL,
+    FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (liked_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Create hashtags table
+CREATE TABLE IF NOT EXISTS hashtags (
+    hashtag_id INT AUTO_INCREMENT PRIMARY KEY,
+    hashtag_text VARCHAR(140) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    num_tweets INT DEFAULT 0
+);
+
+-- Create tweets_hashtags table
+CREATE TABLE IF NOT EXISTS tweets_hashtags (
+    tweet_id INT NOT NULL,
+    hashtag_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (tweet_id, hashtag_id),
+    FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id) ON DELETE CASCADE,
+    FOREIGN KEY (hashtag_id) REFERENCES hashtags(hashtag_id) ON DELETE CASCADE
+);
+
+-- Create mentions table
+CREATE TABLE IF NOT EXISTS mentions (
+    mention_id INT AUTO_INCREMENT PRIMARY KEY,
+    tweet_id INT NOT NULL,
+    mentioned_user_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    mentioned_user_handle VARCHAR(50) NOT NULL,
+    is_mention BOOLEAN NOT NULL,
+    mentioned_tweet_text VARCHAR(280),
+    FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id) ON DELETE CASCADE,
+    FOREIGN KEY (mentioned_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Create images table
+CREATE TABLE IF NOT EXISTS images (
+    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    image_data MEDIUMBLOB NOT NULL,
+    image_type VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Create tweet_images table
+CREATE TABLE IF NOT EXISTS tweet_images (
+    tweet_id INT NOT NULL,
+    image_id INT NOT NULL,
+    PRIMARY KEY (tweet_id, image_id),
+    FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id) ON DELETE CASCADE,
+    FOREIGN KEY (image_id) REFERENCES images(image_id) ON DELETE CASCADE
+);
+
+-- Create user_profile_images table
+CREATE TABLE IF NOT EXISTS user_profile_images (
+    user_id INT NOT NULL PRIMARY KEY,
+    image_id INT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (image_id) REFERENCES images(image_id) ON DELETE CASCADE
+);
+
+-- Create user_followers table
+CREATE TABLE IF NOT EXISTS user_followers (
+    follower_id INT NOT NULL,
+    following_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, following_id),
+    FOREIGN KEY (follower_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (following_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Triggers to maintain follower count
+DELIMITER $$
+
+CREATE TRIGGER increase_follower_count
+AFTER INSERT ON user_followers
+FOR EACH ROW
+BEGIN
+    UPDATE users 
+    SET follower_count = follower_count + 1
+    WHERE user_id = NEW.following_id;
+END $$
+
+CREATE TRIGGER decrease_follower_count
+AFTER DELETE ON user_followers
+FOR EACH ROW
+BEGIN
+    UPDATE users 
+    SET follower_count = follower_count - 1
+    WHERE user_id = OLD.following_id;
+END $$
+
+DELIMITER ;
+
+
+-- Crear tabla de roles
+CREATE TABLE IF NOT EXISTS roles (
+    role_id INT AUTO_INCREMENT PRIMARY KEY,  -- Identificador único del rol
+    role_name VARCHAR(50) NOT NULL UNIQUE   -- Nombre del rol (único)
+);
+
+-- Crear tabla de permisos
+CREATE TABLE IF NOT EXISTS permissions (
+    permission_id INT AUTO_INCREMENT PRIMARY KEY,  -- Identificador único del permiso
+    permission_name VARCHAR(100) NOT NULL UNIQUE   -- Nombre del permiso (único)
+);
+
+-- Crear tabla de asignación de permisos a roles (relación muchos a muchos entre roles y permisos)
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id INT NOT NULL,     -- ID del rol
+    permission_id INT NOT NULL,  -- ID del permiso
+    PRIMARY KEY (role_id, permission_id),  -- Clave primaria compuesta
+    FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE CASCADE,  -- Clave foránea para el ID del rol
+    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE  -- Clave foránea para el ID del permiso
+);
+
+
+
+-- Insertar roles
+INSERT INTO roles (role_name) VALUES
+('Administrador'),
+('Usuario Regular');
+
+-- Insertar permisos
+INSERT INTO permissions (permission_name) VALUES
+('Crear publicaciones'),
+('Editar perfil'),
+('Eliminar comentarios'),
+('Moderar contenido');
+
+-- Insertar asignaciones de permisos a roles
+-- Aquí deberás definir qué permisos pertenecen a qué roles
+-- Por ejemplo:
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+(1, 1), -- Administrador tiene permiso para crear publicaciones
+(1, 2), -- Administrador tiene permiso para editar perfiles
+(1, 3), -- Administrador tiene permiso para eliminar comentarios
+(1, 4); -- Administrador tiene permiso para moderar contenido
+
+
+
+-- Insertar usuarios
+INSERT INTO users (user_handle, email_address, first_name, last_name, phonenumber) VALUES
+('jperez', 'jperez@ejemplo.com', 'Juan', 'Pérez', '+50370123456'),
+('mgarcia', 'mgarcia@ejemplo.com', 'María', 'García', '+50371234567'),
+('lrodriguez', 'lrodriguez@ejemplo.com', 'Luis', 'Rodríguez', '+50372345678'),
+('acastro', 'acastro@ejemplo.com', 'Ana', 'Castro', '+50373456789'),
+('dmartinez', 'dmartinez@ejemplo.com', 'Daniel', 'Martínez', '+50374567890');
+
+-- Insertar tweets
+INSERT INTO tweets (user_id, tweet_text) VALUES
+(1, '¡Feliz de unirme a Twitter! #hola'),
+(2, 'Acabo de tomar el mejor café de mi vida. #mañana'),
+(3, 'Trabajando en un nuevo proyecto, ¡pronto más novedades! #trabajo'),
+(4, 'Me encanta la nueva temporada de mi serie favorita. #televisión'),
+(5, 'No puedo creer que ya sea junio. #eltiempovuela');
+
+-- Insertar retweets
+INSERT INTO retweets (tweet_id, user_id, is_quoted, is_retweet, quoted_tweet_text) VALUES
+(1, 2, FALSE, TRUE, NULL),
+(2, 3, TRUE, TRUE, '¡Totalmente de acuerdo contigo!'),
+(3, 4, FALSE, TRUE, NULL),
+(4, 5, FALSE, TRUE, NULL),
+(5, 1, TRUE, TRUE, '¡El tiempo realmente vuela!');
+
+-- Insertar comentarios
+INSERT INTO comments (tweet_id, user_id, comment_text, is_comment, commented_user_id) VALUES
+(1, 3, '¡Bienvenido a Twitter!', TRUE, 1),
+(2, 4, '¡Yo también amo el café de la mañana!', TRUE, 2),
+(3, 5, '¡No puedo esperar para verlo!', TRUE, 3),
+(4, 1, '¿Qué serie estás viendo?', TRUE, 4),
+(5, 2, '¡Este año está pasando muy rápido!', TRUE, 5);
+
+-- Insertar likes
+INSERT INTO likes (tweet_id, user_id, is_liked, liked_user_id) VALUES
+(1, 4, TRUE, 1),
+(2, 5, TRUE, 2),
+(3, 1, TRUE, 3),
+(4, 2, TRUE, 4),
+(5, 3, TRUE, 
+
+5);
+
+-- Insertar hashtags
+INSERT INTO hashtags (hashtag_text) VALUES
+('#hola'),
+('#mañana'),
+('#trabajo'),
+('#televisión'),
+('#eltiempovuela');
+
+-- Insertar tweets_hashtags
+INSERT INTO tweets_hashtags (tweet_id, hashtag_id) VALUES
+(1, 1),
+(2, 2),
+(3, 3),
+(4, 4),
+(5, 5);
+
+-- Insertar menciones
+INSERT INTO mentions (tweet_id, mentioned_user_id, mentioned_user_handle, is_mention) VALUES
+(1, 2, 'mgarcia', TRUE),
+(2, 3, 'lrodriguez', TRUE),
+(3, 4, 'acastro', TRUE),
+(4, 5, 'dmartinez', TRUE),
+(5, 1, 'jperez', TRUE);
+
+-- Insertar seguidores de usuarios
+INSERT INTO user_followers (follower_id, following_id) VALUES
+(2, 1),
+(3, 2),
+(4, 3),
+(5, 4),
+(1, 5);
